@@ -8,10 +8,17 @@ class Ponto:
 
 # Classe que representa um polígono formado por uma lista de pontos
 class Poligono:
-    def __init__(self, pontos: list[Ponto]):
+    def __init__(self, pontos: list[Ponto], cor:bool = True):
         self.pontos = pontos
+        self.cor = cor
 
     def desenhar_arestas(self, tela):
+
+        # Verifica se terá arestas para desenhar
+        if (self.cor):
+            aresta_cor = BRANCO
+        else:
+            aresta_cor = PRETO
 
         # Descobre os limites do polígono para desenhar as arestas
         y_min = min(ponto.y for ponto in self.pontos)
@@ -36,7 +43,7 @@ class Poligono:
                 
                 # Desenha a linha entre os dois pontos
                 for y in range(ponto1.y, ponto2.y):
-                    tela.set_at((int(x), y), BRANCO)  # Desenha um pixel branco na posição calculada
+                    tela.set_at((int(x), y), aresta_cor)  # Desenha um pixel na posição calculada
                     x += Tx # Atualiza a coordenada x para a próxima scanline
 
 
@@ -45,6 +52,13 @@ BRANCO = (255, 255, 255)
 PRETO = (0, 0, 0)
 AZUL = (0, 122, 204)
 AZUL_CLARO = (51, 153, 255)
+VERMELHO = (255, 0, 0)
+VERDE = (0, 255, 0)
+AMARELO = (255, 255, 0)
+ROXO = (128, 0, 128)
+LARANJA = (255, 165, 0)
+CINZA = (128, 128, 128)
+
 
 class PainelUI:
     def __init__(self, x, y, largura, altura, cor_fundo=(BRANCO)):
@@ -94,19 +108,63 @@ class AreaDesenho:
                 return True
         return False
 
+class Botao:
+    def __init__(self, x, y, largura, altura, texto, tam_fonte = 36, cor_fonte=BRANCO, cor=AZUL, cor_hover=AZUL_CLARO):
+        """Inicializa o botão com suas propriedades.
+
+        Parâmetros:
+            x, y (int): Posição horizontal e vertical do botão.
+            largura (int): Dimensão de largura do botão.
+            altura (int): Dimensão de altura do botão.
+            texto (str): Texto a ser exibido no botão.
+            tam_fonte (int): Tamanho da fonte do texto.
+            cor_fonte (tuple): Cor do texto em formato RGB.
+            cor (tuple): Cor padrão do fundo do botão.
+            cor_hover (tuple): Cor do botão quando o mouse está sobre ele.
+        """
+
+        self.rect = pygame.Rect(x, y, largura, altura)
+        self.texto = texto
+        self.fonte = pygame.font.Font(None, tam_fonte)
+        self.cor_fonte = cor_fonte
+        self.cor = cor
+        self.cor_hover = cor_hover
+
+    def desenhar(self, tela):
+        # Captura a posição atual do mouse para o efeito de "hover" (passar o mouse por cima)
+        mouse_pos = pygame.mouse.get_pos()
+        
+        # Muda a cor se o mouse estiver sobre o botão
+        if self.rect.collidepoint(mouse_pos):
+            cor_atual = self.cor_hover
+        else:
+            cor_atual = self.cor
+            
+        # Desenha o retângulo do botão
+        pygame.draw.rect(tela, cor_atual, self.rect, border_radius=8) # border_radius arredonda os cantos
+        
+        # Renderiza e centraliza o texto dentro do botão
+        superficie_texto = self.fonte.render(self.texto, True, self.cor_fonte)
+        rect_texto = superficie_texto.get_rect(center=self.rect.center)
+        tela.blit(superficie_texto, rect_texto)
+
+    def foi_clicado(self, event):
+        # Verifica se o evento foi um clique esquerdo E se ocorreu dentro do botão
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.rect.collidepoint(event.pos):
+                return True
+        return False
+
 pygame.init()
 
-# Cores
-BRANCO = (255, 255, 255)
-PRETO = (0, 0, 0)
-AZUL = (0, 122, 204)
-AZUL_CLARO = (51, 153, 255)
 
 tela = pygame.display.set_mode((1200, 600))
 pygame.display.set_caption("Divisão de Áreas")
 
 painel_ui = PainelUI(850, 0, 350, 600, BRANCO)
 area_desenho = AreaDesenho(0, 0, 850, 600, PRETO)
+
+botao_arestas = Botao(900, 50, 250, 50, "Exibe Arestas", tam_fonte=30, cor=AZUL, cor_hover=AZUL_CLARO)
 
 # Criar estruturas que irão armazenar os polígonos e pontos desenhados
 Pontos = [] # Lista para armazenar os pontos clicados pelo mouse
@@ -128,6 +186,11 @@ while rodando:
             # Verifica se o clique foi na UI
             if (painel_ui.foi_clicado(event)):
                 print("Painel de UI foi clicado!")
+
+                if (botao_arestas.foi_clicado(event)):
+                    print("Botão 'Exibe Arestas' foi clicado!")
+                    for poligono in Poligonos:
+                        poligono.cor = not poligono.cor  # Alterna a exibição das arestas do polígono
 
             # Verifica se o clique foi na área de desenho
             if (area_desenho.foi_clicado(event)):
@@ -151,6 +214,7 @@ while rodando:
     # 3. FASE DE DESENHO CONTÍNUO (renderiza tudo que existe a cada frame)
     area_desenho.desenhar(tela)
     painel_ui.desenhar(tela)
+    botao_arestas.desenhar(tela)
 
     # Desenha os pontos que estão sendo clicados e ainda não viraram polígonos
     for p in Pontos:

@@ -8,14 +8,17 @@ class Ponto:
 
 # Classe que representa um polígono formado por uma lista de pontos
 class Poligono:
-    def __init__(self, pontos: list[Ponto], cor:bool = True):
+    def __init__(self, pontos: list[Ponto], cor:bool = False):
         self.pontos = pontos
         self.cor = cor
+        self.selecionado = False # Indica se o polígono está selecionado
 
     def desenhar_arestas(self, tela):
 
         # Verifica se terá arestas para desenhar
-        if (self.cor):
+        if self.selecionado:
+            aresta_cor = VERMELHO
+        elif self.cor:
             aresta_cor = BRANCO
         else:
             aresta_cor = PRETO
@@ -169,6 +172,7 @@ botao_arestas = Botao(900, 50, 250, 50, "Exibe Arestas", tam_fonte=30, cor=AZUL,
 # Criar estruturas que irão armazenar os polígonos e pontos desenhados
 Pontos = [] # Lista para armazenar os pontos clicados pelo mouse
 Poligonos = [] # Lista para armazenar os polígonos desenhados
+Botoes_Poligonos = [] # Lista para armazenar os botões dos polígonos desenhados 
 
 rodando = True
 while rodando:
@@ -189,8 +193,27 @@ while rodando:
 
                 if (botao_arestas.foi_clicado(event)):
                     print("Botão 'Exibe Arestas' foi clicado!")
-                    for poligono in Poligonos:
-                        poligono.cor = not poligono.cor  # Alterna a exibição das arestas do polígono
+                    tem_aresta = any(poligono.cor for poligono in Poligonos)  # Verifica se algum polígono está com arestas exibidas
+                    if (tem_aresta):
+                        print("Desativando exibição das arestas dos polígonos.")
+                        for poligono in Poligonos:
+                            poligono.cor = False # Alterna a exibição das arestas do polígono
+                    else:
+                        print("Ativando exibição das arestas dos polígonos.")
+                        for poligono in Poligonos:
+                            poligono.cor = True # Alterna a exibição das arestas do polígono
+
+                for i, botao in enumerate(Botoes_Poligonos):
+                    if botao.foi_clicado(event):
+                        print(f"Polígono {i + 1} foi selecionado!")
+
+                        # desmarca todos os polígonos
+                        for p in Poligonos:
+                            p.selecionado = False
+
+                        # Marca apenas o polígono correspondente ao botão clicado
+                        Poligonos[i].selecionado = True
+
 
             # Verifica se o clique foi na área de desenho
             if (area_desenho.foi_clicado(event)):
@@ -204,17 +227,37 @@ while rodando:
                 # Botão direito = armazena o polígono formado pelos pontos clicados.
                 elif event.button == 3:
                     if len(Pontos) >= 3: # Verifica se há pelo menos 3 pontos para formar um polígono
-                        PoligonosAux = Poligono(Pontos)
+                        tem_aresta = any(poligono.cor for poligono in Poligonos)  # Verifica se algum polígono está com arestas exibidas
+
+                        PoligonosAux = Poligono(Pontos, tem_aresta) # Cria um novo polígono com os pontos armazenados
                         Poligonos.append(PoligonosAux)
                         Pontos = []  # Limpa a lista de pontos após criar o polígono
                         print("Polígono criado com sucesso!")
+
+                        # Criar botão dinâmico
+                        qtd = len(Poligonos)
+                        # a posição y aumenta em cada botão criado, para que eles não se sobreponham
+                        y_botao = 320 + (qtd - 1) * 60
+
+                        novo_botao = Botao(875, y_botao, 305, 50, f"Polígono {qtd}", tam_fonte=28, cor=AZUL, cor_hover=AZUL_CLARO)
+                        Botoes_Poligonos.append(novo_botao)
+
                     else:
                         print("É necessário pelo menos 3 pontos para formar um polígono.")
 
     # 3. FASE DE DESENHO CONTÍNUO (renderiza tudo que existe a cada frame)
     area_desenho.desenhar(tela)
     painel_ui.desenhar(tela)
+
+    # Desenhar area para seleção de cores
+    pygame.draw.rect(tela, (200, 200, 200), pygame.Rect(875, 150, 305, 150))
+
+    # Desenha os botões na tela
     botao_arestas.desenhar(tela)
+
+    # Desenha os botões dos polígonos
+    for botao in Botoes_Poligonos:
+        botao.desenhar(tela)
 
     # Desenha os pontos que estão sendo clicados e ainda não viraram polígonos
     for p in Pontos:

@@ -174,6 +174,8 @@ Pontos = [] # Lista para armazenar os pontos clicados pelo mouse
 Poligonos = [] # Lista para armazenar os polígonos desenhados
 Botoes_Poligonos = [] # Lista para armazenar os botões dos polígonos desenhados 
 
+scroll_y = 0  # <--- NOVA VARIÁVEL DE SCROLL
+
 rodando = True
 while rodando:
     # 1. Limpa a tela
@@ -184,6 +186,28 @@ while rodando:
         if event.type == pygame.QUIT:
             rodando = False
 
+        # --- VERIFICAÇÃO DE ROLAGEM DO MOUSE ---
+        if event.type == pygame.MOUSEWHEEL:
+            # Pega a posição do mouse para rolar apenas se estiver sobre o painel
+            if painel_ui.rect.collidepoint(pygame.mouse.get_pos()):
+                # event.y retorna 1 (cima) ou -1 (baixo)
+                scroll_y += event.y * 30 
+                
+                # Calcula os limites do scroll
+                altura_total_botoes = len(Botoes_Poligonos) * 55
+                espaco_disponivel = 600 - 320 # Altura da tela menos onde os botões começam
+                
+                # O limite mínimo impede de rolar para o infinito vazio embaixo
+                limite_minimo = min(0, espaco_disponivel - altura_total_botoes)
+                
+                # Garante que o scroll fique travado entre o limite mínimo e 0 (topo)
+                scroll_y = max(limite_minimo, min(0, scroll_y))
+
+        # --- ATUALIZA A POSIÇÃO Y DOS BOTÕES SEMPRE ---
+        # Isso garante que tanto os botões novos quanto os antigos apliquem o scroll_y e os cliques funcionem no lugar certo
+        for i, botao in enumerate(Botoes_Poligonos):
+            botao.rect.y = 320 + (i * 55) + scroll_y
+        
         # Verifica se ocorreu um clique do mouse
         if event.type == pygame.MOUSEBUTTONDOWN:
 
@@ -256,8 +280,19 @@ while rodando:
     botao_arestas.desenhar(tela)
 
     # Desenha os botões dos polígonos
+    # for botao in Botoes_Poligonos:
+    #    botao.desenhar(tela)
+
+    # --- DESENHO DOS BOTÕES COM CORTE (CLIPPING) ---
+    # Define a área onde os botões podem aparecer (de y=320 até o final da tela=600)
+    area_visivel_scroll = pygame.Rect(850, 320, 350, 280)
+    tela.set_clip(area_visivel_scroll) # Trava o desenho nessa área
+    
     for botao in Botoes_Poligonos:
         botao.desenhar(tela)
+        
+    tela.set_clip(None) # Destrava a tela para desenhar o resto normalmente
+    # -----------------------------------------------
 
     # Desenha os pontos que estão sendo clicados e ainda não viraram polígonos
     for p in Pontos:

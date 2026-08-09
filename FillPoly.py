@@ -228,7 +228,6 @@ botao_arestas = Botao(900, 50, 250, 50, "Exibe Arestas", tam_fonte=30, cor=AZUL,
 # Criar estruturas que irão armazenar os polígonos e pontos desenhados
 Pontos = [] # Lista para armazenar os pontos clicados pelo mouse
 Poligonos = [] # Lista para armazenar os polígonos desenhados
-Botoes_Poligonos = [] # Lista para armazenar os botões dos polígonos desenhados 
 
 scroll_y = 0  # <--- NOVA VARIÁVEL DE SCROLL
 
@@ -241,28 +240,6 @@ while rodando:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             rodando = False
-
-        # --- VERIFICAÇÃO DE ROLAGEM DO MOUSE ---
-        if event.type == pygame.MOUSEWHEEL:
-            # Pega a posição do mouse para rolar apenas se estiver sobre o painel
-            if painel_ui.rect.collidepoint(pygame.mouse.get_pos()):
-                # event.y retorna 1 (cima) ou -1 (baixo)
-                scroll_y += event.y * 30 
-                
-                # Calcula os limites do scroll
-                altura_total_botoes = len(Botoes_Poligonos) * 55
-                espaco_disponivel = 600 - 320 # Altura da tela menos onde os botões começam
-                
-                # O limite mínimo impede de rolar para o infinito vazio embaixo
-                limite_minimo = min(0, espaco_disponivel - altura_total_botoes)
-                
-                # Garante que o scroll fique travado entre o limite mínimo e 0 (topo)
-                scroll_y = max(limite_minimo, min(0, scroll_y))
-
-        # --- ATUALIZA A POSIÇÃO Y DOS BOTÕES SEMPRE ---
-        # Isso garante que tanto os botões novos quanto os antigos apliquem o scroll_y e os cliques funcionem no lugar certo
-        for i, botao in enumerate(Botoes_Poligonos):
-            botao.rect.y = 320 + (i * 55) + scroll_y
         
         # Verifica se ocorreu um clique do mouse
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -283,18 +260,6 @@ while rodando:
                         for poligono in Poligonos:
                             poligono.cor = True # Alterna a exibição das arestas do polígono
 
-                for i, botao in enumerate(Botoes_Poligonos):
-                    if botao.foi_clicado(event):
-                        print(f"Polígono {i + 1} foi selecionado!")
-
-                        # desmarca todos os polígonos
-                        for p in Poligonos:
-                            p.selecionado = False
-
-                        # Marca apenas o polígono correspondente ao botão clicado
-                        Poligonos[i].selecionado = True
-
-
             # Verifica se o clique foi na área de desenho
             if (area_desenho.foi_clicado(event)):
                 print("Área de desenho foi clicada!")
@@ -314,14 +279,6 @@ while rodando:
                         Pontos = []  # Limpa a lista de pontos após criar o polígono
                         print("Polígono criado com sucesso!")
 
-                        # Criar botão dinâmico
-                        qtd = len(Poligonos)
-                        # a posição y aumenta em cada botão criado, para que eles não se sobreponham
-                        y_botao = 320 + (qtd - 1) * 60
-
-                        novo_botao = Botao(875, y_botao, 305, 50, f"Polígono {qtd}", tam_fonte=28, cor=AZUL, cor_hover=AZUL_CLARO)
-                        Botoes_Poligonos.append(novo_botao)
-
                     else:
                         print("É necessário pelo menos 3 pontos para formar um polígono.")
 
@@ -334,21 +291,6 @@ while rodando:
 
     # Desenha os botões na tela
     botao_arestas.desenhar(tela)
-
-    # Desenha os botões dos polígonos
-    # for botao in Botoes_Poligonos:
-    #    botao.desenhar(tela)
-
-    # --- DESENHO DOS BOTÕES COM CORTE (CLIPPING) ---
-    # Define a área onde os botões podem aparecer (de y=320 até o final da tela=600)
-    area_visivel_scroll = pygame.Rect(850, 320, 350, 280)
-    tela.set_clip(area_visivel_scroll) # Trava o desenho nessa área
-    
-    for botao in Botoes_Poligonos:
-        botao.desenhar(tela)
-        
-    tela.set_clip(None) # Destrava a tela para desenhar o resto normalmente
-    # -----------------------------------------------
 
     # Desenha os pontos que estão sendo clicados e ainda não viraram polígonos
     for p in Pontos:

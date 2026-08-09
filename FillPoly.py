@@ -1,3 +1,4 @@
+import math
 import pygame
 
 # Classe que armazena as coordenadas de um ponto
@@ -48,6 +49,61 @@ class Poligono:
                 for y in range(ponto1.y, ponto2.y):
                     tela.set_at((int(x), y), aresta_cor)  # Desenha um pixel na posição calculada
                     x += Tx # Atualiza a coordenada x para a próxima scanline
+
+    # calcula a tabela de interseçoes para o algoritmo de preenchimento
+    #calcula para cada scalnline do poligono a lista de intersecoes x com as arestas
+    def calcular_tabela_intersecoes(self):
+        
+        y_min = min(ponto.y for ponto in self.pontos)
+        y_max = max(ponto.y for ponto in self.pontos)
+        Ns = y_max - y_min  
+
+        # Array de Ns listas vazias, uma para cada scanline 
+        tabela_x = [[] for _ in range(Ns)]
+
+        for i in range(len(self.pontos)):
+            p_atual = self.pontos[i]
+            p_prox = self.pontos[(i + 1) % len(self.pontos)]
+
+            
+            if p_atual.y < p_prox.y:
+                ponto1, ponto2 = p_atual, p_prox
+            else:
+                ponto1, ponto2 = p_prox, p_atual
+
+            
+            if ponto1.y == ponto2.y:
+                continue
+
+            Tx = (ponto2.x - ponto1.x) / (ponto2.y - ponto1.y)  
+            x = ponto1.x
+
+            
+            for y in range(ponto1.y, ponto2.y):
+                indice_scanline = y - y_min
+                tabela_x[indice_scanline].append(x)
+                x += Tx
+
+        return tabela_x, y_min
+
+    def preencher(self, tela, cor_preenchimento):
+        '''Preche o interior do poligono usando o algoritmo Fillpoly.'''
+
+        tabela_x, y_min = self.calcular_tabela_intersecoes()
+
+        for indice, lista_x in enumerate(tabela_x):
+            # Ordena as interseções em ordem crescente de x
+            lista_x.sort()
+
+            y = y_min + indice  # y real da tela dessa scanline
+
+            # Percorre a lista aos pares: (x_ini, x_fim), (x_ini, x_fim), ...
+            for j in range(0, len(lista_x) - 1, 2):
+                x_ini = math.ceil(lista_x[j]) #arredonda para cima
+                x_fim = math.floor(lista_x[j + 1]) #arredonda pra bAIXO
+
+                for x in range(x_ini, x_fim + 1):
+                    tela.set_at((x, y), cor_preenchimento)
 
 
 # Cores
@@ -106,7 +162,7 @@ class AreaDesenho:
 
     def foi_clicado(self, event):
         # Verifica se o evento foi um clique esquerdo E se ocorreu dentro da área de desenho
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 or event.button == 3:
+        if event.type == pygame.MOUSEBUTTONDOWN and (event.button == 1 or event.button == 3):
             if self.rect.collidepoint(event.pos):
                 return True
         return False
@@ -300,6 +356,7 @@ while rodando:
 
     # Desenha as arestas dos polígonos salvos
     for poligono in Poligonos:
+        poligono.preencher(tela, VERDE)
         poligono.desenhar_arestas(tela)
 
     # 4. Atualiza a tela

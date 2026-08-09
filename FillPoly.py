@@ -1,5 +1,56 @@
 import math
+import random
 import pygame
+
+# Cores
+BRANCO = (255, 255, 255)
+PRETO = (0, 0, 0)
+AZUL = (0, 122, 204)
+AZUL_CLARO = (51, 153, 255)
+AZUL_ESCURO = (0, 82, 138)
+VERMELHO = (255, 0, 0)
+VERMELHO_CLARO = (255, 102, 102)
+VERMELHO_ESCURO = (153, 0, 0)
+VERDE = (0, 255, 0)
+VERDE_CLARO = (102, 255, 102)
+VERDE_ESCURO = (0, 153, 0)
+AMARELO = (255, 255, 0)
+AMARELO_CLARO = (255, 255, 153)
+AMARELO_ESCURO = (204, 204, 0)
+ROXO = (128, 0, 128)
+ROXO_CLARO = (178, 102, 255)
+ROXO_ESCURO = (77, 0, 77)
+LARANJA = (255, 165, 0)
+LARANJA_CLARO = (255, 200, 102)
+LARANJA_ESCURO = (204, 102, 0)
+CINZA = (128, 128, 128)
+CINZA_CLARO = (192, 192, 192)
+CINZA_ESCURO = (64, 64, 64)
+
+CORES = [
+    BRANCO,
+    AZUL,
+    AZUL_CLARO,
+    AZUL_ESCURO,
+    VERMELHO,
+    VERMELHO_CLARO,
+    VERMELHO_ESCURO,
+    VERDE,
+    VERDE_CLARO,
+    VERDE_ESCURO,
+    AMARELO,
+    AMARELO_CLARO,
+    AMARELO_ESCURO,
+    ROXO,
+    ROXO_CLARO,
+    ROXO_ESCURO,
+    LARANJA,
+    LARANJA_CLARO,
+    LARANJA_ESCURO,
+    CINZA,
+    CINZA_CLARO,
+    CINZA_ESCURO,
+]
 
 # Classe que armazena as coordenadas de um ponto
 class Ponto:
@@ -9,17 +60,18 @@ class Ponto:
 
 # Classe que representa um polígono formado por uma lista de pontos
 class Poligono:
-    def __init__(self, pontos: list[Ponto], cor:bool = False):
+    def __init__(self, pontos: list[Ponto], aresta:bool = False, cor:tuple = BRANCO):
         self.pontos = pontos
-        self.cor = cor
+        self.aresta = aresta
         self.selecionado = False # Indica se o polígono está selecionado
+        self.cor = cor # Cor do polígono 
 
     def desenhar_arestas(self, tela):
 
         # Verifica se terá arestas para desenhar
         if self.selecionado:
             aresta_cor = VERMELHO
-        elif self.cor:
+        elif self.aresta:
             aresta_cor = BRANCO
         else:
             aresta_cor = PRETO
@@ -86,7 +138,7 @@ class Poligono:
 
         return tabela_x, y_min
 
-    def preencher(self, tela, cor_preenchimento):
+    def preencher(self, tela):
         '''Preche o interior do poligono usando o algoritmo Fillpoly.'''
 
         tabela_x, y_min = self.calcular_tabela_intersecoes()
@@ -103,21 +155,7 @@ class Poligono:
                 x_fim = math.floor(lista_x[j + 1]) #arredonda pra bAIXO
 
                 for x in range(x_ini, x_fim + 1):
-                    tela.set_at((x, y), cor_preenchimento)
-
-
-# Cores
-BRANCO = (255, 255, 255)
-PRETO = (0, 0, 0)
-AZUL = (0, 122, 204)
-AZUL_CLARO = (51, 153, 255)
-VERMELHO = (255, 0, 0)
-VERDE = (0, 255, 0)
-AMARELO = (255, 255, 0)
-ROXO = (128, 0, 128)
-LARANJA = (255, 165, 0)
-CINZA = (128, 128, 128)
-
+                    tela.set_at((x, y), self.cor)
 
 class PainelUI:
     def __init__(self, x, y, largura, altura, cor_fundo=(BRANCO)):
@@ -214,6 +252,9 @@ class Botao:
                 return True
         return False
 
+def selec_cor ():
+    return random.choice(CORES)
+
 pygame.init()
 
 
@@ -274,7 +315,7 @@ while rodando:
                     if len(Pontos) >= 3: # Verifica se há pelo menos 3 pontos para formar um polígono
                         tem_aresta = any(poligono.cor for poligono in Poligonos)  # Verifica se algum polígono está com arestas exibidas
 
-                        PoligonosAux = Poligono(Pontos, tem_aresta) # Cria um novo polígono com os pontos armazenados
+                        PoligonosAux = Poligono(Pontos, tem_aresta, selec_cor()) # Cria um novo polígono com os pontos armazenados
                         Poligonos.append(PoligonosAux)
                         Pontos = []  # Limpa a lista de pontos após criar o polígono
                         print("Polígono criado com sucesso!")
@@ -298,7 +339,7 @@ while rodando:
 
     # Desenha as arestas dos polígonos salvos
     for poligono in Poligonos:
-        poligono.preencher(tela, VERDE)
+        poligono.preencher(tela)
         poligono.desenhar_arestas(tela)
 
     # 4. Atualiza a tela

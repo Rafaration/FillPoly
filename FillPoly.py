@@ -71,7 +71,7 @@ class Poligono:
 
         # Verifica se terá arestas para desenhar
         if self.selecionado:
-            aresta_cor = VERMELHO
+            aresta_cor = BRANCO
         elif self.aresta:
             aresta_cor = BRANCO
         else:
@@ -280,6 +280,36 @@ class Botao:
                 return True
         return False
 
+class BotaoCor:
+    def __init__(self, x, y, tamanho, cor):
+        """Inicializa o botão de cor com suas propriedades.
+
+        Parâmetros:
+            x, y (int): Posição horizontal e vertical do botão.
+            tamanho (int): Dimensão do lado do botão (quadrado).
+            cor (tuple): Cor do botão em formato RGB.
+        """
+
+        self.rect = pygame.Rect(x, y, tamanho, tamanho)
+        self.cor = cor
+
+    def desenhar(self, tela):
+        # Desenha o quadrado com a cor
+        pygame.draw.rect(tela, self.cor, self.rect)
+        # Desenha uma borda preta ao redor do botão para destacá-lo
+        pygame.draw.rect(tela, PRETO, self.rect, 1)
+
+        # Efeito de hover simples (borda mais grossa quando mouse estiver em cima)
+        if self.rect.collidepoint(pygame.mouse.get_pos()):
+            pygame.draw.rect(tela, PRETO, self.rect, 3)
+
+    def foi_clicado(self, event):
+        # Verifica se o evento foi um clique esquerdo E se ocorreu dentro do botão
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.rect.collidepoint(event.pos):
+                return True
+        return False
+
 def selec_cor ():
     return random.choice(CORES)
 
@@ -294,11 +324,30 @@ area_desenho = AreaDesenho(0, 0, 850, 600, PRETO)
 
 botao_arestas = Botao(900, 50, 250, 50, "Exibe Arestas", tam_fonte=30, cor=AZUL, cor_hover=AZUL_CLARO)
 
+# ---- SETUP DAS CORES ----
+botoes_cores = []
+tamanho_botao = 30
+espacamento = 20
+
+# Posições iniciais baseadas no retângulo cinza
+inicio_x = 885
+inicio_y = 160
+
+for i, cor in enumerate(CORES):
+    colunas = 6
+
+    linha = i // colunas   
+    coluna = i % colunas   
+
+    x = inicio_x + coluna * (tamanho_botao + espacamento)
+    y = inicio_y + linha * (tamanho_botao + espacamento)
+
+    botoes_cores.append(BotaoCor(x, y, tamanho_botao, cor))
+
+
 # Criar estruturas que irão armazenar os polígonos e pontos desenhados
 Pontos = [] # Lista para armazenar os pontos clicados pelo mouse
 Poligonos = [] # Lista para armazenar os polígonos desenhados
-
-scroll_y = 0  # <--- NOVA VARIÁVEL DE SCROLL
 
 rodando = True
 while rodando:
@@ -317,6 +366,7 @@ while rodando:
             if (painel_ui.foi_clicado(event)):
                 print("Painel de UI foi clicado!")
 
+                # Checa o botão de exibir arestas foi clicado
                 if (botao_arestas.foi_clicado(event)):
                     print("Botão 'Exibe Arestas' foi clicado!")
                     tem_aresta = any(poligono.aresta for poligono in Poligonos)  # Verifica se algum polígono está com arestas exibidas
@@ -328,6 +378,17 @@ while rodando:
                         print("Ativando exibição das arestas dos polígonos.")
                         for poligono in Poligonos:
                             poligono.aresta = True # Alterna a exibição das arestas do polígono
+
+                # Checa os botões da paleta de cores
+                for botao in botoes_cores:
+                    if botao.foi_clicado(event):
+                        print(f"Botão de cor {botao.cor} foi clicado!")
+                        # Altera a cor dos polígonos selecionados
+                        for poligono in Poligonos:
+                            if poligono.selecionado:
+                                poligono.cor = botao.cor
+                                print(f"Polígono selecionado alterado para a cor {botao.cor}.")
+                                break
 
             # 2. Verifica se o clique foi na área de desenho
             if (area_desenho.foi_clicado(event)):
@@ -396,10 +457,13 @@ while rodando:
     painel_ui.desenhar(tela)
 
     # Desenhar area para seleção de cores
-    pygame.draw.rect(tela, (200, 200, 200), pygame.Rect(875, 150, 305, 150))
+    pygame.draw.rect(tela, (200, 200, 200), pygame.Rect(875, 150, 305, 200))
 
     # Desenha os botões na tela
     botao_arestas.desenhar(tela)
+
+    for botao in botoes_cores:
+        botao.desenhar(tela)
 
     # Desenha os pontos que estão sendo clicados e ainda não viraram polígonos
     for p in Pontos:

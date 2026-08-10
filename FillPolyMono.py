@@ -2,7 +2,10 @@ import math
 import random
 import pygame
 
-# Cores
+# ============================================================
+# CORES
+# ============================================================
+
 BRANCO = (255, 255, 255)
 PRETO = (0, 0, 0)
 AZUL = (0, 122, 204)
@@ -27,6 +30,7 @@ CINZA = (128, 128, 128)
 CINZA_CLARO = (192, 192, 192)
 CINZA_ESCURO = (64, 64, 64)
 
+# Paleta exibida ao usuário para trocar a cor de preenchimento do polígono selecionado
 CORES = [
     BRANCO,
     AZUL,
@@ -52,73 +56,70 @@ CORES = [
     CINZA_ESCURO,
 ]
 
-# Classe que armazena as coordenadas de um ponto
+
+# ============================================================
+# MODELOS GEOMÉTRICOS (Ponto, Polígono, algoritmo fillpoly)
+# ============================================================
+
 class Ponto:
+    '''Representa uma coordenada (x, y) no sistema de referência da tela (SRT).
+
+    Parâmetros:
+        x (int): Coordenada horizontal.
+        y (int): Coordenada vertical.
+    '''
+
     def __init__(self, x: int, y: int):
         self.x = x
         self.y = y
 
-# Classe que representa um polígono formado por uma lista de pontos
+
 class Poligono:
-    def __init__(self, pontos_externos: list[Ponto], aresta:bool = False, cor:tuple = BRANCO):
-        # O primeiro elemento é a borda externa. Os próximos serão os buracos
-        self.contornos = [pontos_externos]
+    '''Representa um polígono desenhado pelo usuário, com possíveis buracos.
+
+    O polígono é armazenado como uma lista de contornos: o primeiro elemento
+    de `contornos` é sempre o contorno externo, e os demais (se existirem)
+    são os buracos. Todos os contornos entram juntos na mesma tabela de
+    interseções do fillpoly, o que faz a regra par-ímpar do algoritmo
+    resolver buracos e autointerseção automaticamente, sem lógica extra.
+
+    Parâmetros:
+        pontos_externos (list[Ponto]): Vértices do contorno externo, na ordem
+            em que foram clicados.
+        aresta (bool): Se True, as arestas do polígono são desenhadas em branco.
+        cor (tuple): Cor RGB de preenchimento do polígono.
+    '''
+
+    def __init__(self, pontos_externos: list[Ponto], aresta: bool = False, cor: tuple = BRANCO):
+        self.contornos = [pontos_externos]  # [0] = contorno externo; [1:] = buracos
         self.aresta = aresta
-        self.selecionado = False # Indica se o polígono está selecionado
-        self.cor = cor # Cor do polígono
-        self.atualizar_geometria() 
+        self.selecionado = False  # Indica se o polígono está selecionado
+        self.cor = cor  # Cor de preenchimento do polígono
+        self.atualizar_geometria()
 
     def adicionar_buraco(self, pontos_buraco: list[Ponto]):
-        '''Adiciona um novo contorno interno (buraco) e recalcula a matemática'''
+        '''Adiciona um novo contorno interno (buraco) e recalcula a geometria.'''
         self.contornos.append(pontos_buraco)
         self.atualizar_geometria()
 
     def atualizar_geometria(self):
-        '''Recalcula os limites e atabela de interseções'''
+        '''Recalcula os limites verticais (y_min, y_max) e a tabela de interseções.
+
+        Precisa ser chamado sempre que um contorno for adicionado ou alterado,
+        já que a tabela de interseções é cacheada em `self.tabela_intersecoes`.
+        '''
         todos_pontos = [p for contorno in self.contornos for p in contorno]
         self.y_min = min(p.y for p in todos_pontos)
         self.y_max = max(p.y for p in todos_pontos)
         self.Ns = self.y_max - self.y_min
         self.tabela_intersecoes = self.calcular_tabela_intersecoes()
 
-    def desenhar_arestas(self, tela):
-
-        # Verifica se terá arestas para desenhar
-        if self.selecionado:
-            aresta_cor = BRANCO
-        elif self.aresta:
-            aresta_cor = BRANCO
-        else:
-            return 
-
-        # Desenha as arestas de TODOS os contornos (externo + buracos)
-        for contorno in self.contornos:
-            # Calculado o coeficiente angular da reta dos pontos
-            for i in range(len(contorno)):
-                p_atual = contorno[i]
-                p_prox = contorno[(i + 1) % len(contorno)]
-                
-                            
-                if p_atual.y < p_prox.y:
-                    ponto1, ponto2 = p_atual, p_prox
-                else:
-                    ponto1, ponto2 = p_prox, p_atual
-                
-                if ponto1.y != ponto2.y:  # Evita divisão por zero
-                    Tx = (ponto2.x - ponto1.x) / (ponto2.y - ponto1.y)  # Coeficiente angular
-
-                    x = ponto1.x # Inicializa x com a coordenada x do ponto1
-                    
-                    # Desenha a linha entre os dois pontos
-                    for y in range(ponto1.y, ponto2.y):
-                        tela.set_at((int(x), y), aresta_cor)  # Desenha um pixel na posição calculada
-                        x += Tx # Atualiza a coordenada x para a próxima scanline
-
-    # calcula a tabela de interseçoes para o algoritmo de preenchimento
-    #calcula para cada scalnline do poligono a lista de intersecoes x com as arestas
     def calcular_tabela_intersecoes(self):
-
-        # Array de Ns listas vazias, uma para cada scanline 
+        '''Calcula, para cada scanline do polígono, a lista de interseções x
+        com as arestas de todos os contornos (externo + buracos), usando
+        aritmética incremental (Tx = dx/dy).
+        '''
+        # Array de Ns listas vazias, uma para cada scanline
         tabela_x = [[] for _ in range(self.Ns)]
 
         # Itera sobre todos os contornos para montar a tabela unificada
@@ -127,20 +128,18 @@ class Poligono:
                 p_atual = contorno[i]
                 p_prox = contorno[(i + 1) % len(contorno)]
 
-                
                 if p_atual.y < p_prox.y:
                     ponto1, ponto2 = p_atual, p_prox
                 else:
                     ponto1, ponto2 = p_prox, p_atual
 
-                
                 if ponto1.y == ponto2.y:
-                    continue
+                    continue  # Aresta horizontal: não é processada
 
-                Tx = (ponto2.x - ponto1.x) / (ponto2.y - ponto1.y)  
+                Tx = (ponto2.x - ponto1.x) / (ponto2.y - ponto1.y)
                 x = ponto1.x
 
-                
+                # Processa de ymin até (ymax - 1), como especificado nos slides
                 for y in range(ponto1.y, ponto2.y):
                     indice_scanline = y - self.y_min
                     tabela_x[indice_scanline].append(x)
@@ -149,27 +148,57 @@ class Poligono:
         return tabela_x
 
     def preencher(self, tela):
-        '''Preche o interior do poligono usando o algoritmo Fillpoly.'''
-
+        '''Preenche o interior do polígono usando o algoritmo fillpoly.'''
         tabela_x = self.tabela_intersecoes
 
         for indice, lista_x in enumerate(tabela_x):
             # Ordena as interseções em ordem crescente de x
             lista_x.sort()
 
-            y = self.y_min + indice  # y real da tela dessa scanline
+            y = self.y_min + indice  # y real da tela para essa scanline
 
             # Percorre a lista aos pares: (x_ini, x_fim), (x_ini, x_fim), ...
             for j in range(0, len(lista_x) - 1, 2):
-                x_ini = math.ceil(lista_x[j]) #arredonda para cima
-                x_fim = math.floor(lista_x[j + 1]) #arredonda pra bAIXO
+                x_ini = math.ceil(lista_x[j])    # arredonda para cima
+                x_fim = math.floor(lista_x[j + 1])  # arredonda para baixo
 
                 for x in range(x_ini, x_fim + 1):
                     tela.set_at((x, y), self.cor)
 
-    def contem_ponto(self, ponto: Ponto) -> bool:
-        '''Verifica se o ponto está dentro do polígono utilizando a tabela de interseções.'''
+    def desenhar_arestas(self, tela):
+        '''Desenha, em branco, as arestas de todos os contornos (externo + buracos),
+        caso o polígono esteja selecionado ou com a exibição de arestas ativada.
+        '''
+        if self.selecionado or self.aresta:
+            aresta_cor = BRANCO
+        else:
+            return
 
+        for contorno in self.contornos:
+            for i in range(len(contorno)):
+                p_atual = contorno[i]
+                p_prox = contorno[(i + 1) % len(contorno)]
+
+                if p_atual.y < p_prox.y:
+                    ponto1, ponto2 = p_atual, p_prox
+                else:
+                    ponto1, ponto2 = p_prox, p_atual
+
+                if ponto1.y == ponto2.y:
+                    continue  # Aresta horizontal: não é desenhada por aqui
+
+                Tx = (ponto2.x - ponto1.x) / (ponto2.y - ponto1.y)
+                x = ponto1.x
+
+                for y in range(ponto1.y, ponto2.y):
+                    tela.set_at((int(x), y), aresta_cor)
+                    x += Tx
+
+    def contem_ponto(self, ponto: Ponto) -> bool:
+        '''Testa se `ponto` está na região interna do polígono, reaproveitando
+        a mesma tabela de interseções do fillpoly (regra par-ímpar). Pontos
+        dentro de um buraco retornam False automaticamente, sem lógica extra.
+        '''
         tabela_x = self.tabela_intersecoes
         y_max = self.y_min + len(tabela_x) - 1
 
@@ -181,30 +210,34 @@ class Poligono:
         indice = ponto.y - self.y_min
         intersecoes_x = tabela_x[indice]
 
-        # O FillPoly precisa das interseções ordenadas para saber onde entra e sai
+        # O fillpoly precisa das interseções ordenadas para saber onde entra e sai
         intersecoes_x.sort()
 
-        # Verifica se o ponto em x está entre os pares de entrada e saída do polígono e não está em um buraco
         for j in range(0, len(intersecoes_x) - 1, 2):
             x_ini = intersecoes_x[j]
             x_fim = intersecoes_x[j + 1]
 
             if x_ini <= ponto.x <= x_fim:
-                return True  # O ponto está dentro do polígono
+                return True  # Ponto está dentro do polígono (ou fora de um buraco)
 
-        return False  # O ponto não está dentro do polígono
+        return False  # Ponto está fora do polígono (ou dentro de um buraco)
+
+
+# ============================================================
+# COMPONENTES DE INTERFACE (painel, botões, área de desenho)
+# ============================================================
 
 class PainelUI:
-    def __init__(self, x, y, largura, altura, cor_fundo=(BRANCO)):
-        '''Inicializa o painel de UI com suas propriedades.
-        
-        Parâmetros:
-            x, y (int): Posição horizontal e vertical do painel.
-            largura (int): Dimensão de largura do painel.
-            altura (int): Dimensão de altura do painel.
-            cor_fundo (tuple): Cor de fundo do painel em formato RGB.
-        '''
+    '''Painel lateral que agrupa os controles (botões, paleta de cores).
 
+    Parâmetros:
+        x, y (int): Posição horizontal e vertical do painel.
+        largura (int): Dimensão de largura do painel.
+        altura (int): Dimensão de altura do painel.
+        cor_fundo (tuple): Cor de fundo do painel em formato RGB.
+    '''
+
+    def __init__(self, x, y, largura, altura, cor_fundo=BRANCO):
         self.rect = pygame.Rect(x, y, largura, altura)
         self.cor_fundo = cor_fundo
 
@@ -218,17 +251,18 @@ class PainelUI:
                 return True
         return False
 
-class AreaDesenho:
-    def __init__(self, x, y, largura, altura, cor_fundo=(PRETO)):
-        '''Inicializa a área de desenho com suas propriedades.
-        
-        Parâmetros:
-            x, y (int): Posição horizontal e vertical da área de desenho.
-            largura (int): Dimensão de largura da área de desenho.
-            altura (int): Dimensão de altura da área de desenho.
-            cor_fundo (tuple): Cor de fundo da área de desenho em formato RGB.
-        '''
 
+class AreaDesenho:
+    '''Área onde o usuário desenha e seleciona polígonos com o mouse.
+
+    Parâmetros:
+        x, y (int): Posição horizontal e vertical da área de desenho.
+        largura (int): Dimensão de largura da área de desenho.
+        altura (int): Dimensão de altura da área de desenho.
+        cor_fundo (tuple): Cor de fundo da área de desenho em formato RGB.
+    '''
+
+    def __init__(self, x, y, largura, altura, cor_fundo=PRETO):
         self.rect = pygame.Rect(x, y, largura, altura)
         self.cor_fundo = cor_fundo
 
@@ -236,27 +270,28 @@ class AreaDesenho:
         pygame.draw.rect(tela, self.cor_fundo, self.rect)
 
     def foi_clicado(self, event):
-        # Verifica se o evento foi um clique esquerdo E se ocorreu dentro da área de desenho
+        # Verifica se o evento foi um clique esquerdo ou direito dentro da área de desenho
         if event.type == pygame.MOUSEBUTTONDOWN and (event.button == 1 or event.button == 3):
             if self.rect.collidepoint(event.pos):
                 return True
         return False
 
+
 class Botao:
-    def __init__(self, x, y, largura, altura, texto, tam_fonte = 36, cor_fonte=BRANCO, cor=AZUL, cor_hover=AZUL_CLARO):
-        """Inicializa o botão com suas propriedades.
+    '''Botão retangular clicável com texto e efeito de hover.
 
-        Parâmetros:
-            x, y (int): Posição horizontal e vertical do botão.
-            largura (int): Dimensão de largura do botão.
-            altura (int): Dimensão de altura do botão.
-            texto (str): Texto a ser exibido no botão.
-            tam_fonte (int): Tamanho da fonte do texto.
-            cor_fonte (tuple): Cor do texto em formato RGB.
-            cor (tuple): Cor padrão do fundo do botão.
-            cor_hover (tuple): Cor do botão quando o mouse está sobre ele.
-        """
+    Parâmetros:
+        x, y (int): Posição horizontal e vertical do botão.
+        largura (int): Dimensão de largura do botão.
+        altura (int): Dimensão de altura do botão.
+        texto (str): Texto a ser exibido no botão.
+        tam_fonte (int): Tamanho da fonte do texto.
+        cor_fonte (tuple): Cor do texto em formato RGB.
+        cor (tuple): Cor padrão do fundo do botão.
+        cor_hover (tuple): Cor do botão quando o mouse está sobre ele.
+    '''
 
+    def __init__(self, x, y, largura, altura, texto, tam_fonte=36, cor_fonte=BRANCO, cor=AZUL, cor_hover=AZUL_CLARO):
         self.rect = pygame.Rect(x, y, largura, altura)
         self.texto = texto
         self.fonte = pygame.font.Font(None, tam_fonte)
@@ -267,16 +302,11 @@ class Botao:
     def desenhar(self, tela):
         # Captura a posição atual do mouse para o efeito de "hover" (passar o mouse por cima)
         mouse_pos = pygame.mouse.get_pos()
-        
-        # Muda a cor se o mouse estiver sobre o botão
-        if self.rect.collidepoint(mouse_pos):
-            cor_atual = self.cor_hover
-        else:
-            cor_atual = self.cor
-            
-        # Desenha o retângulo do botão
-        pygame.draw.rect(tela, cor_atual, self.rect, border_radius=8) # border_radius arredonda os cantos
-        
+
+        cor_atual = self.cor_hover if self.rect.collidepoint(mouse_pos) else self.cor
+
+        pygame.draw.rect(tela, cor_atual, self.rect, border_radius=8)
+
         # Renderiza e centraliza o texto dentro do botão
         superficie_texto = self.fonte.render(self.texto, True, self.cor_fonte)
         rect_texto = superficie_texto.get_rect(center=self.rect.center)
@@ -289,26 +319,26 @@ class Botao:
                 return True
         return False
 
+
 class BotaoCor:
+    '''Quadrado clicável de uma cor da paleta, usado para trocar a cor
+    de preenchimento do polígono selecionado.
+
+    Parâmetros:
+        x, y (int): Posição horizontal e vertical do botão.
+        tamanho (int): Dimensão do lado do botão (quadrado).
+        cor (tuple): Cor do botão em formato RGB.
+    '''
+
     def __init__(self, x, y, tamanho, cor):
-        """Inicializa o botão de cor com suas propriedades.
-
-        Parâmetros:
-            x, y (int): Posição horizontal e vertical do botão.
-            tamanho (int): Dimensão do lado do botão (quadrado).
-            cor (tuple): Cor do botão em formato RGB.
-        """
-
         self.rect = pygame.Rect(x, y, tamanho, tamanho)
         self.cor = cor
 
     def desenhar(self, tela):
-        # Desenha o quadrado com a cor
         pygame.draw.rect(tela, self.cor, self.rect)
-        # Desenha uma borda preta ao redor do botão para destacá-lo
-        pygame.draw.rect(tela, PRETO, self.rect, 1)
+        pygame.draw.rect(tela, PRETO, self.rect, 1)  # borda para destacar o botão
 
-        # Efeito de hover simples (borda mais grossa quando mouse estiver em cima)
+        # Efeito de hover simples (borda mais grossa quando o mouse está em cima)
         if self.rect.collidepoint(pygame.mouse.get_pos()):
             pygame.draw.rect(tela, PRETO, self.rect, 3)
 
@@ -319,11 +349,17 @@ class BotaoCor:
                 return True
         return False
 
-def selec_cor ():
+
+def selecionar_cor_aleatoria():
+    '''Sorteia uma cor da paleta — usada como cor inicial de um polígono recém-criado.'''
     return random.choice(CORES)
 
-pygame.init()
 
+# ============================================================
+# SETUP
+# ============================================================
+
+pygame.init()
 
 tela = pygame.display.set_mode((1200, 600))
 pygame.display.set_caption("FillPoly Monolítico")
@@ -334,31 +370,43 @@ area_desenho = AreaDesenho(0, 0, 850, 600, PRETO)
 botao_arestas = Botao(900, 50, 250, 50, "Alternar Arestas", tam_fonte=30, cor=AZUL, cor_hover=AZUL_CLARO)
 botao_remover = Botao(900, 400, 250, 50, "Remover Polígono", tam_fonte=30, cor=VERMELHO, cor_hover=VERMELHO_CLARO)
 
-# ---- SETUP DAS CORES ----
-botoes_cores = []
+# ---- Paleta de cores ----
+# Moldura cinza de fundo da paleta (desenhada no loop principal) e a grade de
+# botões de cor compartilham a mesma área visual — mantidas como constantes
+# nomeadas aqui para não desalinhar se alguém ajustar só uma das duas.
+PALETA_X = 875
+PALETA_Y = 150
+PALETA_LARGURA = 305
+PALETA_ALTURA = 200
+MOLDURA_PALETA = (200, 200, 200)  # cor de fundo da moldura (igual ao original)
+
 tamanho_botao = 30
 espacamento = 20
+colunas_paleta = 6
 
-# Posições iniciais baseadas no retângulo cinza
-inicio_x = 885
-inicio_y = 160
+# Posições da grade com uma margem de 10px em relação à moldura
+inicio_x = PALETA_X + 10
+inicio_y = PALETA_Y + 10
 
+botoes_cores = []
 for i, cor in enumerate(CORES):
-    colunas = 6
-
-    linha = i // colunas   
-    coluna = i % colunas   
+    linha = i // colunas_paleta
+    coluna = i % colunas_paleta
 
     x = inicio_x + coluna * (tamanho_botao + espacamento)
     y = inicio_y + linha * (tamanho_botao + espacamento)
 
     botoes_cores.append(BotaoCor(x, y, tamanho_botao, cor))
 
+# Estruturas que armazenam os polígonos e pontos desenhados
+pontos = []          # Pontos clicados pelo mouse, ainda não fechados em um polígono
+pontos_buraco = []   # Pontos clicados pelo mouse, ainda não fechados em um buraco
+poligonos = []       # Polígonos já criados
 
-# Criar estruturas que irão armazenar os polígonos e pontos desenhados
-Pontos = [] # Lista para armazenar os pontos clicados pelo mouse
-PontosBuraco = [] 
-Poligonos = [] # Lista para armazenar os polígonos desenhados
+
+# ============================================================
+# LOOP PRINCIPAL
+# ============================================================
 
 rodando = True
 while rodando:
@@ -370,136 +418,120 @@ while rodando:
         if event.type == pygame.QUIT:
             rodando = False
 
-        # Verifica se ocorreu um clique do mouse
         elif event.type == pygame.MOUSEBUTTONDOWN:
 
-            # 1. Verifica se o clique foi na UI
-            if (painel_ui.foi_clicado(event)):
+            # --- Clique na UI (painel lateral) ---
+            if painel_ui.foi_clicado(event):
                 print("Painel de UI foi clicado!")
 
-                # 1. Checa o botão de exibir arestas foi clicado
-                if (botao_arestas.foi_clicado(event)):
-                    print("Botão 'Exibe Arestas' foi clicado!")
-                    tem_aresta = any(poligono.aresta for poligono in Poligonos)  # Verifica se algum polígono está com arestas exibidas
-                    if (tem_aresta):
+                # Botão "Alternar Arestas"
+                if botao_arestas.foi_clicado(event):
+                    print("Botão 'Alternar Arestas' foi clicado!")
+                    tem_aresta = any(poligono.aresta for poligono in poligonos)
+                    if tem_aresta:
                         print("Desativando exibição das arestas dos polígonos.")
-                        for poligono in Poligonos:
-                            poligono.aresta = False # Alterna a exibição das arestas do polígono
+                        for poligono in poligonos:
+                            poligono.aresta = False
                     else:
                         print("Ativando exibição das arestas dos polígonos.")
-                        for poligono in Poligonos:
-                            poligono.aresta = True # Alterna a exibição das arestas do polígono
+                        for poligono in poligonos:
+                            poligono.aresta = True
 
-                # 2. Checa os botões da paleta de cores
+                # Botões da paleta de cores
                 for botao in botoes_cores:
                     if botao.foi_clicado(event):
                         print(f"Botão de cor {botao.cor} foi clicado!")
-                        # Altera a cor dos polígonos selecionados
-                        for poligono in Poligonos:
+                        # Altera a cor do polígono selecionado
+                        for poligono in poligonos:
                             if poligono.selecionado:
                                 poligono.cor = botao.cor
                                 print(f"Polígono selecionado alterado para a cor {botao.cor}.")
                                 break
 
-                # 3. Checa o botão de remover polígono
-                if (botao_remover.foi_clicado(event)):
+                # Botão "Remover Polígono"
+                if botao_remover.foi_clicado(event):
                     print("Botão 'Remover Polígono' foi clicado!")
-
-                    # Remove o polígono selecionado, se houver algum
                     poligono_removido = False
-                    for p in Poligonos:
+                    for p in poligonos:
                         if p.selecionado:
-                            Poligonos.remove(p)
+                            poligonos.remove(p)
                             poligono_removido = True
                             print("Polígono selecionado removido com sucesso!")
-                            break # Sai do loop após remover o polígono
+                            break
                     if not poligono_removido:
                         print("Nenhum polígono selecionado para remover.")
 
-            # 2. Verifica se o clique foi na área de desenho
-            if (area_desenho.foi_clicado(event)):
+            # --- Clique na área de desenho ---
+            if area_desenho.foi_clicado(event):
                 print("Área de desenho foi clicada!")
 
-                # Checa o modificador do teclado (se o CTRL está pressionado)
                 mods = pygame.key.get_mods()
-                ctrl_pressionado = (mods & pygame.KMOD_CTRL)
-                shift_pressionado = (mods & pygame.KMOD_SHIFT) 
+                ctrl_pressionado = mods & pygame.KMOD_CTRL
+                shift_pressionado = mods & pygame.KMOD_SHIFT
 
-                # botão esquerdo = armazena o ponto.
                 if event.button == 1:
-                    # SELEÇÃO: Se o CTRL + botão esquerdo
+                    # SELEÇÃO: CTRL + botão esquerdo
                     if ctrl_pressionado:
                         print("Modo de seleção ativado!")
-                        poligono_selecionado = None
+                        ponto_clicado = Ponto(event.pos[0], event.pos[1])
+                        poligono_clicado = None
 
-                        # 1. Identifica qual polígono foi clicado (o mais acima)
-                        for poligono in reversed(Poligonos):
-                            if poligono.contem_ponto(Ponto(event.pos[0], event.pos[1])):
-                                poligono_selecionado = poligono
-                                break # Achou o alvo, para a busca
+                        # Identifica qual polígono foi clicado (o mais acima, topo da pilha)
+                        for poligono in reversed(poligonos):
+                            if poligono.contem_ponto(ponto_clicado):
+                                poligono_clicado = poligono
+                                break
 
-                        # 2. Aplica a exclusividade da seleção (só um polígono pode estar selecionado)
-                        if poligono_selecionado:
-                                # guarda o estado atual antes de resetar tudo
-                                estado_anterior = poligono_selecionado.selecionado
+                        if poligono_clicado:
+                            # Alterna a seleção do polígono clicado, garantindo que
+                            # apenas um polígono fique selecionado por vez
+                            estado_anterior = poligono_clicado.selecionado
+                            for p in poligonos:
+                                p.selecionado = False
+                            poligono_clicado.selecionado = not estado_anterior
 
-                                # Forçamos todos para False
-                                # Isso garante que apenas o polígono clicado ficará selecionado
-                                for p in Poligonos:
-                                    p.selecionado = False
-
-                                # Altera o estado APENAS do polígono clicado
-                                poligono_selecionado.selecionado = not estado_anterior  # Alterna o estado do polígono clicado
-
-                                estado = "selecionado" if poligono_selecionado.selecionado else "deselecionado"
-                                print(f"Polígono {estado}.")
-
-                        else: 
-                            # se clicou fora de todos os polígonos, desmarca todos
-                            for p in Poligonos:
+                            estado = "selecionado" if poligono_clicado.selecionado else "deselecionado"
+                            print(f"Polígono {estado}.")
+                        else:
+                            # Clique fora de qualquer polígono: limpa a seleção
+                            for p in poligonos:
                                 p.selecionado = False
                             print("Clique fora. Seleção limpa!")
 
-                    # 2. Inserir buraco (SHIFT)
+                    # BURACO: SHIFT + botão esquerdo adiciona um ponto de buraco
                     elif shift_pressionado:
-                        # O buracodeve pertencer a alguém
-                        # Verifica se existe um, e apenas um, poligono selecionado
-                        alvo = next((p for p in Poligonos if p.selecionado), None)
+                        alvo = next((p for p in poligonos if p.selecionado), None)
                         if alvo:
-                            PontosBuraco.append(Ponto(event.pos[0], event.pos[1]))
-                            print(f"Ponto de buraco adicionado no polígono selecionado.")
+                            pontos_buraco.append(Ponto(event.pos[0], event.pos[1]))
+                            print("Ponto de buraco adicionado no polígono selecionado.")
                         else:
-                            print("ERRO: Você precisa selecionar um polígono (CTRL+Clique) antes de desenhar um buraco.")
+                            print("ERRO: selecione um polígono (CTRL+clique) antes de desenhar um buraco.")
 
-                    # DESENHO: Se o CTRL não estiver pressionado, adiciona o ponto normalmente
+                    # DESENHO: clique simples adiciona um vértice ao polígono em construção
                     else:
-                        # Se não estiver pressionado o CTRL, adiciona o ponto normalmente
-                        PontosAux = Ponto(event.pos[0], event.pos[1])
-                        Pontos.append(PontosAux)
-                        print(f"Ponto adicionado: ({PontosAux.x}, {PontosAux.y})")
+                        novo_ponto = Ponto(event.pos[0], event.pos[1])
+                        pontos.append(novo_ponto)
+                        print(f"Ponto adicionado: ({novo_ponto.x}, {novo_ponto.y})")
 
-                # Botão direito = armazena o polígono formado pelos pontos clicados.
                 elif event.button == 3:
-                    # Fehar buraco
+                    # SHIFT + botão direito: fecha o buraco em construção
                     if shift_pressionado:
-                        alvo = next((p for p in Poligonos if p.selecionado), None)
-                        if alvo and len(PontosBuraco) >= 3:
-                            alvo.adicionar_buraco(PontosBuraco)
-                            PontosBuraco = [] # Limpa a lista
-                            print("Buraco cravado no polígono")
+                        alvo = next((p for p in poligonos if p.selecionado), None)
+                        if alvo and len(pontos_buraco) >= 3:
+                            alvo.adicionar_buraco(pontos_buraco)
+                            pontos_buraco = []
+                            print("Buraco adicionado ao polígono selecionado.")
                         else:
-                            print("Sua geometria de buraco precisa de pelo menos 3 pontos e um polígono selecionado")
+                            print("O buraco precisa de pelo menos 3 pontos e um polígono selecionado.")
 
-                    # Fechar polígono normal
+                    # Botão direito simples: fecha o polígono em construção
                     else:
-                        if len(Pontos) >= 3: # Verifica se há pelo menos 3 pontos para formar um polígono
-                            tem_aresta = any(poligono.aresta for poligono in Poligonos)  # Verifica se algum polígono está com arestas exibidas
-
-                            PoligonosAux = Poligono(Pontos, tem_aresta, selec_cor()) # Cria um novo polígono com os pontos armazenados
-                            Poligonos.append(PoligonosAux)
-                            Pontos = []  # Limpa a lista de pontos após criar o polígono
+                        if len(pontos) >= 3:
+                            tem_aresta = any(poligono.aresta for poligono in poligonos)
+                            novo_poligono = Poligono(pontos, tem_aresta, selecionar_cor_aleatoria())
+                            poligonos.append(novo_poligono)
+                            pontos = []
                             print("Polígono criado com sucesso!")
-
                         else:
                             print("É necessário pelo menos 3 pontos para formar um polígono.")
 
@@ -507,30 +539,27 @@ while rodando:
     area_desenho.desenhar(tela)
     painel_ui.desenhar(tela)
 
-    # Desenhar area para seleção de cores
-    pygame.draw.rect(tela, (200, 200, 200), pygame.Rect(875, 150, 305, 200))
+    # Moldura de fundo da paleta de cores
+    pygame.draw.rect(tela, MOLDURA_PALETA, pygame.Rect(PALETA_X, PALETA_Y, PALETA_LARGURA, PALETA_ALTURA))
 
-    # Desenha os botões na tela
     botao_arestas.desenhar(tela)
-
     botao_remover.desenhar(tela)
 
     for botao in botoes_cores:
         botao.desenhar(tela)
 
-
-    # Desenha as arestas dos polígonos salvos
-    for poligono in Poligonos:
+    # Polígonos já criados: preenchimento + arestas
+    for poligono in poligonos:
         poligono.preencher(tela)
         poligono.desenhar_arestas(tela)
 
-    # Desenha os pontos que estão sendo clicados e ainda não viraram polígonos
-    for p in Pontos:
-        tela.set_at((p.x, p.y), BRANCO) # Desenha um pixel branco na posição do ponto
+    # Pontos do polígono em construção (ainda não fechado)
+    for p in pontos:
+        tela.set_at((p.x, p.y), BRANCO)
 
-    # FeedBack visual claro: Pontos de buracs em vermelho
-    for p in PontosBuraco:
+    # Pontos do buraco em construção (feedback visual em vermelho)
+    for p in pontos_buraco:
         tela.set_at((p.x, p.y), VERMELHO)
-        
+
     # 4. Atualiza a tela
     pygame.display.flip()

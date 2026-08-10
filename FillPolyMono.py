@@ -60,15 +60,26 @@ class Ponto:
 
 # Classe que representa um polígono formado por uma lista de pontos
 class Poligono:
-    def __init__(self, pontos: list[Ponto], aresta:bool = False, cor:tuple = BRANCO):
-        self.pontos = pontos
+    def __init__(self, pontos_externos: list[Ponto], aresta:bool = False, cor:tuple = BRANCO):
+        # O primeiro elemento é a borda externa. Os próximos serão os buracos
+        self.contornos = [pontos_externos]
         self.aresta = aresta
         self.selecionado = False # Indica se o polígono está selecionado
-        self.cor = cor # Cor do polígono 
-        self.tabela_intersecoes = self.calcular_tabela_intersecoes() # Calcula a tabela de interseções ao criar o polígono
-        self.y_min = min(ponto.y for ponto in self.pontos) # Armazena o valor mínimo de y do polígono
-        self.y_max = max(ponto.y for ponto in self.pontos) # Armazena o valor máximo de y do polígono
-        self.Ns = self.y_max - self.y_min # Calcula o número de scanlines (linhas horizontais) do polígono
+        self.cor = cor # Cor do polígono
+        self.atualizar_geometria() 
+
+    def adicionar_buraco(self, pontos_buraco: list[Ponto]):
+        '''Adiciona um novo contorno interno (buraco) e recalcula a matemática'''
+        self.contornos.append(pontos_buraco)
+        self.atualizar_geometria()
+
+    def atualizar_geometria(self):
+        '''Recalcula os limites e atabela de interseções'''
+        todos_pontos = [p for contorno in self.contornos for p in contorno]
+        self.y_min = min(p.y for p in todos_pontos)
+        self.y_max = max(p.y for p in todos_pontos)
+        self.Ns = self.y_max - self.y_min
+        self.tabela_intersecoes = self.calcular_tabela_intersecoes()
 
     def desenhar_arestas(self, tela):
 
@@ -78,78 +89,75 @@ class Poligono:
         elif self.aresta:
             aresta_cor = BRANCO
         else:
-            aresta_cor = PRETO
+            return 
 
-        # Calcula o número de scanlines (linhas horizontais)
-        Ns = self.Ns # a de baixo a gente não conta
-
-        # Calculado o coeficiente angular da reta dos pontos
-        for i in range(len(self.pontos)):
-            p_atual = self.pontos[i]
-            p_prox = self.pontos[(i + 1) % len(self.pontos)]
-            
-                        
-            if p_atual.y < p_prox.y:
-                ponto1, ponto2 = p_atual, p_prox
-            else:
-                ponto1, ponto2 = p_prox, p_atual
-            
-            if ponto1.y != ponto2.y:  # Evita divisão por zero
-                Tx = (ponto2.x - ponto1.x) / (ponto2.y - ponto1.y)  # Coeficiente angular
-
-                x = ponto1.x # Inicializa x com a coordenada x do ponto1
+        # Desenha as arestas de TODOS os contornos (externo + buracos)
+        for contorno in self.contornos:
+            # Calculado o coeficiente angular da reta dos pontos
+            for i in range(len(contorno)):
+                p_atual = contorno[i]
+                p_prox = contorno[(i + 1) % len(contorno)]
                 
-                # Desenha a linha entre os dois pontos
-                for y in range(ponto1.y, ponto2.y):
-                    tela.set_at((int(x), y), aresta_cor)  # Desenha um pixel na posição calculada
-                    x += Tx # Atualiza a coordenada x para a próxima scanline
+                            
+                if p_atual.y < p_prox.y:
+                    ponto1, ponto2 = p_atual, p_prox
+                else:
+                    ponto1, ponto2 = p_prox, p_atual
+                
+                if ponto1.y != ponto2.y:  # Evita divisão por zero
+                    Tx = (ponto2.x - ponto1.x) / (ponto2.y - ponto1.y)  # Coeficiente angular
+
+                    x = ponto1.x # Inicializa x com a coordenada x do ponto1
+                    
+                    # Desenha a linha entre os dois pontos
+                    for y in range(ponto1.y, ponto2.y):
+                        tela.set_at((int(x), y), aresta_cor)  # Desenha um pixel na posição calculada
+                        x += Tx # Atualiza a coordenada x para a próxima scanline
 
     # calcula a tabela de interseçoes para o algoritmo de preenchimento
     #calcula para cada scalnline do poligono a lista de intersecoes x com as arestas
     def calcular_tabela_intersecoes(self):
-        
-        y_min = self.y_min
-        
-        Ns = self.Ns
 
         # Array de Ns listas vazias, uma para cada scanline 
-        tabela_x = [[] for _ in range(Ns)]
+        tabela_x = [[] for _ in range(self.Ns)]
 
-        for i in range(len(self.pontos)):
-            p_atual = self.pontos[i]
-            p_prox = self.pontos[(i + 1) % len(self.pontos)]
+        # Itera sobre todos os contornos para montar a tabela unificada
+        for contorno in self.contornos:
+            for i in range(len(contorno)):
+                p_atual = contorno[i]
+                p_prox = contorno[(i + 1) % len(contorno)]
 
-            
-            if p_atual.y < p_prox.y:
-                ponto1, ponto2 = p_atual, p_prox
-            else:
-                ponto1, ponto2 = p_prox, p_atual
+                
+                if p_atual.y < p_prox.y:
+                    ponto1, ponto2 = p_atual, p_prox
+                else:
+                    ponto1, ponto2 = p_prox, p_atual
 
-            
-            if ponto1.y == ponto2.y:
-                continue
+                
+                if ponto1.y == ponto2.y:
+                    continue
 
-            Tx = (ponto2.x - ponto1.x) / (ponto2.y - ponto1.y)  
-            x = ponto1.x
+                Tx = (ponto2.x - ponto1.x) / (ponto2.y - ponto1.y)  
+                x = ponto1.x
 
-            
-            for y in range(ponto1.y, ponto2.y):
-                indice_scanline = y - y_min
-                tabela_x[indice_scanline].append(x)
-                x += Tx
+                
+                for y in range(ponto1.y, ponto2.y):
+                    indice_scanline = y - self.y_min
+                    tabela_x[indice_scanline].append(x)
+                    x += Tx
 
-        return tabela_x, y_min
+        return tabela_x
 
     def preencher(self, tela):
         '''Preche o interior do poligono usando o algoritmo Fillpoly.'''
 
-        tabela_x, y_min = self.tabela_intersecoes
+        tabela_x = self.tabela_intersecoes
 
         for indice, lista_x in enumerate(tabela_x):
             # Ordena as interseções em ordem crescente de x
             lista_x.sort()
 
-            y = y_min + indice  # y real da tela dessa scanline
+            y = self.y_min + indice  # y real da tela dessa scanline
 
             # Percorre a lista aos pares: (x_ini, x_fim), (x_ini, x_fim), ...
             for j in range(0, len(lista_x) - 1, 2):
@@ -162,15 +170,15 @@ class Poligono:
     def contem_ponto(self, ponto: Ponto) -> bool:
         '''Verifica se o ponto está dentro do polígono utilizando a tabela de interseções.'''
 
-        tabela_x, y_min = self.tabela_intersecoes
-        y_max = y_min + len(tabela_x) - 1
+        tabela_x = self.tabela_intersecoes
+        y_max = self.y_min + len(tabela_x) - 1
 
         # Se o clique foi acima ou abaixo dos limites do polígono, está fora
-        if ponto.y < y_min or ponto.y > y_max:
+        if ponto.y < self.y_min or ponto.y > y_max:
             return False
 
         # Pega a linha exata onde o clique ocorreu
-        indice = ponto.y - y_min
+        indice = ponto.y - self.y_min
         intersecoes_x = tabela_x[indice]
 
         # O FillPoly precisa das interseções ordenadas para saber onde entra e sai
@@ -349,6 +357,7 @@ for i, cor in enumerate(CORES):
 
 # Criar estruturas que irão armazenar os polígonos e pontos desenhados
 Pontos = [] # Lista para armazenar os pontos clicados pelo mouse
+PontosBuraco = [] 
 Poligonos = [] # Lista para armazenar os polígonos desenhados
 
 rodando = True
@@ -410,9 +419,11 @@ while rodando:
             # 2. Verifica se o clique foi na área de desenho
             if (area_desenho.foi_clicado(event)):
                 print("Área de desenho foi clicada!")
+
                 # Checa o modificador do teclado (se o CTRL está pressionado)
                 mods = pygame.key.get_mods()
                 ctrl_pressionado = (mods & pygame.KMOD_CTRL)
+                shift_pressionado = (mods & pygame.KMOD_SHIFT) 
 
                 # botão esquerdo = armazena o ponto.
                 if event.button == 1:
@@ -449,6 +460,17 @@ while rodando:
                                 p.selecionado = False
                             print("Clique fora. Seleção limpa!")
 
+                    # 2. Inserir buraco (SHIFT)
+                    elif shift_pressionado:
+                        # O buracodeve pertencer a alguém
+                        # Verifica se existe um, e apenas um, poligono selecionado
+                        alvo = next((p for p in Poligonos if p.selecionado), None)
+                        if alvo:
+                            PontosBuraco.append(Ponto(event.pos[0], event.pos[1]))
+                            print(f"Ponto de buraco adicionado no polígono selecionado.")
+                        else:
+                            print("ERRO: Você precisa selecionar um polígono (CTRL+Clique) antes de desenhar um buraco.")
+
                     # DESENHO: Se o CTRL não estiver pressionado, adiciona o ponto normalmente
                     else:
                         # Se não estiver pressionado o CTRL, adiciona o ponto normalmente
@@ -458,16 +480,28 @@ while rodando:
 
                 # Botão direito = armazena o polígono formado pelos pontos clicados.
                 elif event.button == 3:
-                    if len(Pontos) >= 3: # Verifica se há pelo menos 3 pontos para formar um polígono
-                        tem_aresta = any(poligono.aresta for poligono in Poligonos)  # Verifica se algum polígono está com arestas exibidas
+                    # Fehar buraco
+                    if shift_pressionado:
+                        alvo = next((p for p in Poligonos if p.selecionado), None)
+                        if alvo and len(PontosBuraco) >= 3:
+                            alvo.adicionar_buraco(PontosBuraco)
+                            PontosBuraco = [] # Limpa a lista
+                            print("Buraco cravado no polígono")
+                        else:
+                            print("Sua geometria de buraco precisa de pelo menos 3 pontos e um polígono selecionado")
 
-                        PoligonosAux = Poligono(Pontos, tem_aresta, selec_cor()) # Cria um novo polígono com os pontos armazenados
-                        Poligonos.append(PoligonosAux)
-                        Pontos = []  # Limpa a lista de pontos após criar o polígono
-                        print("Polígono criado com sucesso!")
-
+                    # Fechar polígono normal
                     else:
-                        print("É necessário pelo menos 3 pontos para formar um polígono.")
+                        if len(Pontos) >= 3: # Verifica se há pelo menos 3 pontos para formar um polígono
+                            tem_aresta = any(poligono.aresta for poligono in Poligonos)  # Verifica se algum polígono está com arestas exibidas
+
+                            PoligonosAux = Poligono(Pontos, tem_aresta, selec_cor()) # Cria um novo polígono com os pontos armazenados
+                            Poligonos.append(PoligonosAux)
+                            Pontos = []  # Limpa a lista de pontos após criar o polígono
+                            print("Polígono criado com sucesso!")
+
+                        else:
+                            print("É necessário pelo menos 3 pontos para formar um polígono.")
 
     # 3. FASE DE DESENHO CONTÍNUO (renderiza tudo que existe a cada frame)
     area_desenho.desenhar(tela)
@@ -487,6 +521,10 @@ while rodando:
     # Desenha os pontos que estão sendo clicados e ainda não viraram polígonos
     for p in Pontos:
         tela.set_at((p.x, p.y), BRANCO) # Desenha um pixel branco na posição do ponto
+
+    # FeedBack visual claro: Pontos de buracs em vermelho
+    for p in PontosBuraco:
+        tela.set_at((p.x, p.y), VERMELHO)
 
     # Desenha as arestas dos polígonos salvos
     for poligono in Poligonos:

@@ -65,6 +65,7 @@ class Poligono:
         self.aresta = aresta
         self.selecionado = False # Indica se o polígono está selecionado
         self.cor = cor # Cor do polígono 
+        self.tabela_intersecoes = self.calcular_tabela_intersecoes() # Calcula a tabela de interseções ao criar o polígono
 
     def desenhar_arestas(self, tela):
 
@@ -141,7 +142,7 @@ class Poligono:
     def preencher(self, tela):
         '''Preche o interior do poligono usando o algoritmo Fillpoly.'''
 
-        tabela_x, y_min = self.calcular_tabela_intersecoes()
+        tabela_x, y_min = self.tabela_intersecoes
 
         for indice, lista_x in enumerate(tabela_x):
             # Ordena as interseções em ordem crescente de x
@@ -156,6 +157,33 @@ class Poligono:
 
                 for x in range(x_ini, x_fim + 1):
                     tela.set_at((x, y), self.cor)
+
+    def contem_ponto(self, ponto: Ponto) -> bool:
+        '''Verifica se o ponto está dentro do polígono utilizando a tabela de interseções.'''
+
+        tabela_x, y_min = self.tabela_intersecoes
+        y_max = y_min + len(tabela_x) - 1
+
+        # Se o clique foi acima ou abaixo dos limites do polígono, está fora
+        if ponto.y < y_min or ponto.y > y_max:
+            return False
+
+        # Pega a linha exata onde o clique ocorreu
+        indice = ponto.y - y_min
+        intersecoes_x = tabela_x[indice]
+
+        # O FillPoly precisa das interseções ordenadas para saber onde entra e sai
+        intersecoes_x.sort()
+
+        # Verifica se o ponto em x está entre os pares de entrada e saída do polígono e não está em um buraco
+        for j in range(0, len(intersecoes_x) - 1, 2):
+            x_ini = intersecoes_x[j]
+            x_fim = intersecoes_x[j + 1]
+
+            if x_ini <= ponto.x <= x_fim:
+                return True  # O ponto está dentro do polígono
+
+        return False  # O ponto não está dentro do polígono
 
 class PainelUI:
     def __init__(self, x, y, largura, altura, cor_fundo=(BRANCO)):
@@ -281,39 +309,79 @@ while rodando:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             rodando = False
-        
-        # Verifica se ocorreu um clique do mouse
-        if event.type == pygame.MOUSEBUTTONDOWN:
 
-            # Verifica se o clique foi na UI
+        # Verifica se ocorreu um clique do mouse
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+
+            # 1. Verifica se o clique foi na UI
             if (painel_ui.foi_clicado(event)):
                 print("Painel de UI foi clicado!")
 
                 if (botao_arestas.foi_clicado(event)):
                     print("Botão 'Exibe Arestas' foi clicado!")
-                    tem_aresta = any(poligono.cor for poligono in Poligonos)  # Verifica se algum polígono está com arestas exibidas
+                    tem_aresta = any(poligono.aresta for poligono in Poligonos)  # Verifica se algum polígono está com arestas exibidas
                     if (tem_aresta):
                         print("Desativando exibição das arestas dos polígonos.")
                         for poligono in Poligonos:
-                            poligono.cor = False # Alterna a exibição das arestas do polígono
+                            poligono.aresta = False # Alterna a exibição das arestas do polígono
                     else:
                         print("Ativando exibição das arestas dos polígonos.")
                         for poligono in Poligonos:
-                            poligono.cor = True # Alterna a exibição das arestas do polígono
+                            poligono.aresta = True # Alterna a exibição das arestas do polígono
 
-            # Verifica se o clique foi na área de desenho
+            # 2. Verifica se o clique foi na área de desenho
             if (area_desenho.foi_clicado(event)):
                 print("Área de desenho foi clicada!")
+                # Checa o modificador do teclado (se o CTRL está pressionado)
+                mods = pygame.key.get_mods()
+                ctrl_pressionado = (mods & pygame.KMOD_CTRL)
 
                 # botão esquerdo = armazena o ponto.
                 if event.button == 1:
-                    PontosAux = Ponto(event.pos[0], event.pos[1])
-                    Pontos.append(PontosAux)
+                    # SELEÇÃO: Se o CTRL + botão esquerdo
+                    if ctrl_pressionado:
+                        print("Modo de seleção ativado!")
+                        poligono_selecionado = None
+
+                        # 1. Identifica qual polígono foi clicado (o mais acima)
+                        for poligono in reversed(Poligonos):
+                            if poligono.contem_ponto(Ponto(event.pos[0], event.pos[1])):
+                                poligono_selecionado = poligono
+                                break # Achou o alvo, para a busca
+
+                        # 2. Aplica a exclusividade da seleção (só um polígono pode estar selecionado)
+                        if poligono_selecionado:
+                                # guarda o estado atual antes de resetar tudo
+                                estado_anterior = poligono_selecionado.selecionado
+
+                                # Forçamos todos para False
+                                # Isso garante que apenas o polígono clicado ficará selecionado
+                                for p in Poligonos:
+                                    p.selecionado = False
+
+                                # Altera o estado APENAS do polígono clicado
+                                poligono_selecionado.selecionado = not estado_anterior  # Alterna o estado do polígono clicado
+
+                                estado = "selecionado" if poligono_selecionado.selecionado else "deselecionado"
+                                print(f"Polígono {estado}.")
+
+                        else: 
+                            # se clicou fora de todos os polígonos, desmarca todos
+                            for p in Poligonos:
+                                p.selecionado = False
+                            print("Clique fora. Seleção limpa!")
+
+                    # DESENHO: Se o CTRL não estiver pressionado, adiciona o ponto normalmente
+                    else:
+                        # Se não estiver pressionado o CTRL, adiciona o ponto normalmente
+                        PontosAux = Ponto(event.pos[0], event.pos[1])
+                        Pontos.append(PontosAux)
+                        print(f"Ponto adicionado: ({PontosAux.x}, {PontosAux.y})")
 
                 # Botão direito = armazena o polígono formado pelos pontos clicados.
                 elif event.button == 3:
                     if len(Pontos) >= 3: # Verifica se há pelo menos 3 pontos para formar um polígono
-                        tem_aresta = any(poligono.cor for poligono in Poligonos)  # Verifica se algum polígono está com arestas exibidas
+                        tem_aresta = any(poligono.aresta for poligono in Poligonos)  # Verifica se algum polígono está com arestas exibidas
 
                         PoligonosAux = Poligono(Pontos, tem_aresta, selec_cor()) # Cria um novo polígono com os pontos armazenados
                         Poligonos.append(PoligonosAux)

@@ -518,6 +518,12 @@ while rodando:
     for botao in botoes_cores:
         botao.desenhar(tela)
 
+
+    # Desenha as arestas dos polígonos salvos
+    for poligono in Poligonos:
+        poligono.preencher(tela)
+        poligono.desenhar_arestas(tela)
+
     # Desenha os pontos que estão sendo clicados e ainda não viraram polígonos
     for p in Pontos:
         tela.set_at((p.x, p.y), BRANCO) # Desenha um pixel branco na posição do ponto
@@ -525,11 +531,6 @@ while rodando:
     # FeedBack visual claro: Pontos de buracs em vermelho
     for p in PontosBuraco:
         tela.set_at((p.x, p.y), VERMELHO)
-
-    # Desenha as arestas dos polígonos salvos
-    for poligono in Poligonos:
-        poligono.preencher(tela)
-        poligono.desenhar_arestas(tela)
-
+        
     # 4. Atualiza a tela
     pygame.display.flip()

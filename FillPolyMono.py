@@ -326,7 +326,7 @@ pygame.init()
 
 
 tela = pygame.display.set_mode((1200, 600))
-pygame.display.set_caption("Divisão de Áreas")
+pygame.display.set_caption("FillPoly Monolítico")
 
 painel_ui = PainelUI(850, 0, 350, 600, BRANCO)
 area_desenho = AreaDesenho(0, 0, 850, 600, PRETO)

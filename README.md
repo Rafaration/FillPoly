@@ -40,12 +40,6 @@ O arquivo que deve ser executado para a apresentação é o **`FillPolyMono.py`*
 Instalação:
 
 ```bash
-pip install pygame
-```
-
-Ou 
-
-```bash
 pip install pygame-ce
 ```
 

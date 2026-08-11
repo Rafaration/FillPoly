@@ -62,12 +62,7 @@ CORES = [
 # ============================================================
 
 class Ponto:
-    '''Representa uma coordenada (x, y) no sistema de referência da tela (SRT).
-
-    Parâmetros:
-        x (int): Coordenada horizontal.
-        y (int): Coordenada vertical.
-    '''
+    '''Representa uma coordenada (x, y).'''
 
     def __init__(self, x: int, y: int):
         self.x = x
@@ -75,20 +70,7 @@ class Ponto:
 
 
 class Poligono:
-    '''Representa um polígono desenhado pelo usuário, com possíveis buracos.
-
-    O polígono é armazenado como uma lista de contornos: o primeiro elemento
-    de `contornos` é sempre o contorno externo, e os demais (se existirem)
-    são os buracos. Todos os contornos entram juntos na mesma tabela de
-    interseções do fillpoly, o que faz a regra par-ímpar do algoritmo
-    resolver buracos e autointerseção automaticamente, sem lógica extra.
-
-    Parâmetros:
-        pontos_externos (list[Ponto]): Vértices do contorno externo, na ordem
-            em que foram clicados.
-        aresta (bool): Se True, as arestas do polígono são desenhadas em branco.
-        cor (tuple): Cor RGB de preenchimento do polígono.
-    '''
+    '''Representa um polígono desenhado pelo usuário, com possíveis buracos.'''
 
     def __init__(self, pontos_externos: list[Ponto], aresta: bool = False, cor: tuple = BRANCO):
         self.contornos = [pontos_externos]  # [0] = contorno externo; [1:] = buracos
@@ -99,15 +81,13 @@ class Poligono:
 
     def adicionar_buraco(self, pontos_buraco: list[Ponto]):
         '''Adiciona um novo contorno interno (buraco) e recalcula a geometria.'''
+
         self.contornos.append(pontos_buraco)
         self.atualizar_geometria()
 
     def atualizar_geometria(self):
-        '''Recalcula os limites verticais (y_min, y_max) e a tabela de interseções.
+        '''Recalcula os limites verticais (y_min, y_max) e a tabela de interseções.'''
 
-        Precisa ser chamado sempre que um contorno for adicionado ou alterado,
-        já que a tabela de interseções é cacheada em `self.tabela_intersecoes`.
-        '''
         todos_pontos = [p for contorno in self.contornos for p in contorno]
         self.y_min = min(p.y for p in todos_pontos)
         self.y_max = max(p.y for p in todos_pontos)
@@ -115,10 +95,8 @@ class Poligono:
         self.tabela_intersecoes = self.calcular_tabela_intersecoes()
 
     def calcular_tabela_intersecoes(self):
-        '''Calcula, para cada scanline do polígono, a lista de interseções x
-        com as arestas de todos os contornos (externo + buracos), usando
-        aritmética incremental (Tx = dx/dy).
-        '''
+        '''Calcula, para cada scanline do polígono, a lista de interseções x (externo + buracos)'''
+
         # Array de Ns listas vazias, uma para cada scanline
         tabela_x = [[] for _ in range(self.Ns)]
 
@@ -148,7 +126,8 @@ class Poligono:
         return tabela_x
 
     def preencher(self, tela):
-        '''Preenche o interior do polígono usando o algoritmo fillpoly.'''
+        '''Preenche o interior do polígono usando o fillpoly.'''
+
         tabela_x = self.tabela_intersecoes
 
         for indice, lista_x in enumerate(tabela_x):
@@ -166,9 +145,9 @@ class Poligono:
                     tela.set_at((x, y), self.cor)
 
     def desenhar_arestas(self, tela):
-        '''Desenha, em branco, as arestas de todos os contornos (externo + buracos),
-        caso o polígono esteja selecionado ou com a exibição de arestas ativada.
-        '''
+        '''Desenha as arestas em branco (externo + buracos),
+        caso o polígono esteja selecionado ou com a exibição de arestas ativa.'''
+
         if self.selecionado or self.aresta:
             aresta_cor = BRANCO
         else:
@@ -195,10 +174,8 @@ class Poligono:
                     x += Tx
 
     def contem_ponto(self, ponto: Ponto) -> bool:
-        '''Testa se `ponto` está na região interna do polígono, reaproveitando
-        a mesma tabela de interseções do fillpoly (regra par-ímpar). Pontos
-        dentro de um buraco retornam False automaticamente, sem lógica extra.
-        '''
+        '''Testa se um ponto está dentro do polígono'''
+
         tabela_x = self.tabela_intersecoes
         y_max = self.y_min + len(tabela_x) - 1
 
@@ -228,14 +205,7 @@ class Poligono:
 # ============================================================
 
 class PainelUI:
-    '''Painel lateral que agrupa os controles (botões, paleta de cores).
-
-    Parâmetros:
-        x, y (int): Posição horizontal e vertical do painel.
-        largura (int): Dimensão de largura do painel.
-        altura (int): Dimensão de altura do painel.
-        cor_fundo (tuple): Cor de fundo do painel em formato RGB.
-    '''
+    '''Painel lateral que contém os controles (botões, paleta de cores).'''
 
     def __init__(self, x, y, largura, altura, cor_fundo=BRANCO):
         self.rect = pygame.Rect(x, y, largura, altura)
@@ -253,14 +223,7 @@ class PainelUI:
 
 
 class AreaDesenho:
-    '''Área onde o usuário desenha e seleciona polígonos com o mouse.
-
-    Parâmetros:
-        x, y (int): Posição horizontal e vertical da área de desenho.
-        largura (int): Dimensão de largura da área de desenho.
-        altura (int): Dimensão de altura da área de desenho.
-        cor_fundo (tuple): Cor de fundo da área de desenho em formato RGB.
-    '''
+    '''Área onde o usuário desenha e seleciona polígonos com o mouse.'''
 
     def __init__(self, x, y, largura, altura, cor_fundo=PRETO):
         self.rect = pygame.Rect(x, y, largura, altura)
@@ -278,18 +241,7 @@ class AreaDesenho:
 
 
 class Botao:
-    '''Botão retangular clicável com texto e efeito de hover.
-
-    Parâmetros:
-        x, y (int): Posição horizontal e vertical do botão.
-        largura (int): Dimensão de largura do botão.
-        altura (int): Dimensão de altura do botão.
-        texto (str): Texto a ser exibido no botão.
-        tam_fonte (int): Tamanho da fonte do texto.
-        cor_fonte (tuple): Cor do texto em formato RGB.
-        cor (tuple): Cor padrão do fundo do botão.
-        cor_hover (tuple): Cor do botão quando o mouse está sobre ele.
-    '''
+    '''Botão retangular clicável com texto e efeito de hover.'''
 
     def __init__(self, x, y, largura, altura, texto, tam_fonte=36, cor_fonte=BRANCO, cor=AZUL, cor_hover=AZUL_CLARO):
         self.rect = pygame.Rect(x, y, largura, altura)
@@ -321,14 +273,7 @@ class Botao:
 
 
 class BotaoCor:
-    '''Quadrado clicável de uma cor da paleta, usado para trocar a cor
-    de preenchimento do polígono selecionado.
-
-    Parâmetros:
-        x, y (int): Posição horizontal e vertical do botão.
-        tamanho (int): Dimensão do lado do botão (quadrado).
-        cor (tuple): Cor do botão em formato RGB.
-    '''
+    '''Quadrado clicável que seleciona uma cor dentre as disponíveis.'''
 
     def __init__(self, x, y, tamanho, cor):
         self.rect = pygame.Rect(x, y, tamanho, tamanho)
@@ -351,7 +296,7 @@ class BotaoCor:
 
 
 def selecionar_cor_aleatoria():
-    '''Sorteia uma cor da paleta — usada como cor inicial de um polígono recém-criado.'''
+    '''Sorteia uma cor dentre as disponíveis'''
     return random.choice(CORES)
 
 
